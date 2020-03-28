@@ -18,7 +18,7 @@ class DataLoader(data.Dataset):
         self.root_path = root_path
         self.seq_legth = seq_length
         self.tokenized_data = self.tokenize(root_path)
-        self.tokenized_data = self.tokenized_data[:len(self.tokenized_data)//len(self.seq_legth)]
+        self.tokenized_data = self.tokenized_data[:len(self.tokenized_data)//self.seq_legth]
         self.data = np.array(self.tokenized_data).reshape(-1, seq_length)
 
 
