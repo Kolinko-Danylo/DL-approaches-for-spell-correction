@@ -26,7 +26,7 @@ class DataLoader(data.Dataset):
         self.char2int = {ch: ii for ii, ch in self.int2char.items()}
 
         # encoded = np.array([char2int[ch] for ch in text])
-        words = tuple(set(self.tokenized_data))
+        self.words = tuple(set(self.tokenized_data))
         self.int2word = dict(enumerate(words))
         self.word2int = {ch: ii for ii, ch in self.int2word.items()}
 
@@ -85,6 +85,18 @@ class DataLoader(data.Dataset):
     def get_int(self, x):
         return self.word2int[x]
 
+    def get_params(self):
+      param_dict = dict()
+
+      param_dict["chars"] = self.chars
+      param_dict["int2char"] = self.int2char
+      param_dict["char2int"] = self.char2int
+      param_dict["words"] = self.words
+      param_dict["int2word"] = self.int2word
+      param_dict["word2int"] = self.word2int
+
+      return param_dict
+
     def __len__(self):
         return len(self.tokenized_data)
 
@@ -92,7 +104,7 @@ class DataLoader(data.Dataset):
         sequence = self.data[index]
         X = self.get_encodes(sequence.copy())
         y = np.vectorize(self.get_int)(sequence)
-        return X, y
+        return torch.from_numpy(X), torch.from_numpy(y)
 
 
 # def get_batches(arr, batch_size, seq_length):

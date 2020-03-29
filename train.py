@@ -1,0 +1,112 @@
+# from __future__ import print_function
+import torch
+import torch.optim as optim
+from torch.utils import data
+import numpy as np
+import yaml
+import logging
+from model.utils import get_model, get_loss
+from dataload.dataloader import DataLoader
+from metric_counter import MetricCounter
+import os
+
+
+class Trainer(object):
+    def __init__(self, config):
+        self.config = config
+        self.dataset = self._get_dataset(config["dataroot"])
+        self.train_dataset, self.val_dataset, self.test_dataset = data.random_split(self.dataset, [0.8, 0.1, 0.1])
+
+        self.experiment_name = f"{config['experiment_desc']}_{config['model']['model_n']}_loss{config['model']['loss']}"
+        self.metric_counter = MetricCounter(self.experiment_name, self.config["print_every"])
+
+    def train(self):
+        self._init_params()
+        for epoch in range(0, self.epochs):
+            self._run_epoch(epoch)
+            self._validate(epoch)
+            self.scheduler.step()
+
+            if self.metric_counter.update_best_model():
+                torch.save({
+                    'model': self.model.state_dict(),
+                    'optimizer': self.optimizer.state_dict(),
+                    'dataset_params': self.dataset.get_params()
+                }, f'best_{self.config["experiment_desc"]}.pth')
+
+            print(self.metric_counter.loss_message())
+            logging.debug(
+                f"Experiment Name: {self.config['experiment_desc']}, Epoch: {epoch}, Loss: {self.metric_counter.loss_message()}")
+
+    def _run_epoch(self, epoch):
+
+        self.metric_counter.clear()
+        h = None
+        counter = 0 
+        for X, y in self.loader_train:
+            X, y = X.cuda(), y.cuda()
+
+            self.optimizer.zero_grad()
+            output, h = self.model(X, h)
+            loss = self.loss_fn(output, y.view(batch_size*seq_length).long())
+            
+            loss.backward()
+            nn.utils.clip_grad_norm_(net.parameters(), clip)
+            self.optimizer.step()
+
+            self.metric_counter.add_losses(loss)
+          
+          
+            counter += 1
+
+        
+        self.metric_counter.write_to_tensorboard(epoch)
+        
+        
+    
+            
+    def _validate(self, epoch):
+        self.metric_counter.clear()
+        for X, y in self.loader_val:
+            X, y = image.cuda(), mask.cuda()
+            output, h = self.model(X, h)
+
+            loss = self.loss_fn(output, y.view(batch_size*seq_length).long())
+
+            self.metric_counter.add_losses(loss)
+
+        self.metric_counter.write_to_tensorboard(epoch, validation=True)
+
+  
+    def _get_dataset(self, dataroot, seq_length):
+        return DataLoader(dataroot, seq_length)
+ 
+    def _init_params(self):
+
+        self.loader_train = data.DataLoader(self.train_dataset,
+                                            batch_size=self.config['batch_size'],
+                                            shuffle=True)
+        self.loader_val = data.DataLoader(self.val_dataset,
+                                          batch_size=self.config['batch_size'],
+                                          shuffle=False)
+                                          
+        self.model = get_model(self.config['model']['model_n'],
+                               self.dataset.get_params(),
+                               self.config['model']['n_hidden'],
+                               self.config['model']['n_layers'],
+                               self.config['model']['drop_prob'],
+                               self.config['model']['grad_clip'])
+
+        self.epochs = self.config['num_epochs']
+        self.optimizer = self._get_optim(self.model.parameters())
+        self.loss_fn = get_loss(self.config['model']['loss'])
+
+        
+
+
+if __name__ == '__main__':
+    with open('config/comet_segm.yaml', 'r') as f:
+        config = yaml.load(f)
+
+    trainer = Trainer(config)
+    trainer.train()
