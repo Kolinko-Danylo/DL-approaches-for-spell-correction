@@ -14,10 +14,10 @@ import os
 class Trainer(object):
     def __init__(self, config):
         self.config = config
-        self.dataset = self._get_dataset(config["dataroot"])
+        self.dataset = self._get_dataset(config["dataroot"], config["seq_length"])
         self.train_dataset, self.val_dataset, self.test_dataset = data.random_split(self.dataset, [0.8, 0.1, 0.1])
 
-        self.experiment_name = f"{config['experiment_desc']}_{config['model']['model_n']}_loss{config['model']['loss']}"
+        self.experiment_name = f"{config['experiment_desc']}_{config['model']['model_n']}"
         self.metric_counter = MetricCounter(self.experiment_name, self.config["print_every"])
 
     def train(self):
@@ -25,7 +25,6 @@ class Trainer(object):
         for epoch in range(0, self.epochs):
             self._run_epoch(epoch)
             self._validate(epoch)
-            self.scheduler.step()
 
             if self.metric_counter.update_best_model():
                 torch.save({
@@ -48,13 +47,17 @@ class Trainer(object):
 
             self.optimizer.zero_grad()
             output, h = self.model(X, h)
-            loss = self.loss_fn(output, y.view(batch_size*seq_length).long())
+            loss = self.loss_fn(output, y.view(self.config['batch_size']*self.config['seq_length']).long())
             
             loss.backward()
-            nn.utils.clip_grad_norm_(net.parameters(), clip)
+            nn.utils.clip_grad_norm_(net.parameters(), self.config['clip'])
             self.optimizer.step()
 
             self.metric_counter.add_losses(loss)
+
+            if counter %% self.config['print_every']:
+              print(f"Epoch: {epoch}; Train Step: {counter}: {metric_counter.loss_message()}")
+
           
           
             counter += 1
@@ -66,21 +69,37 @@ class Trainer(object):
     
             
     def _validate(self, epoch):
+        self.model.eval()
         self.metric_counter.clear()
+        counter = 0
+
         for X, y in self.loader_val:
-            X, y = image.cuda(), mask.cuda()
+            X, y = X.cuda(), y.cuda()
             output, h = self.model(X, h)
 
-            loss = self.loss_fn(output, y.view(batch_size*seq_length).long())
+            loss = self.loss_fn(output, y.view(self.config['batch_size']*self.config['seq_length']).long())
 
             self.metric_counter.add_losses(loss)
+            if counter %% self.config['print_every']:
+              print(f"Epoch: {epoch}; Valid Step: {counter}: {metric_counter.loss_message()}")
+            counter += 1
 
         self.metric_counter.write_to_tensorboard(epoch, validation=True)
+        self.model.train()
 
   
     def _get_dataset(self, dataroot, seq_length):
         return DataLoader(dataroot, seq_length)
- 
+
+    def _get_optim(self, params):
+        if self.config['optimizer']['name'] == 'adam':
+            optimizer = optim.Adam(params, lr=self.config['optimizer']['lr'])
+        elif self.config['optimizer']['name'] == 'sgd':
+            optimizer = optim.SGD(params, lr=self.config['optimizer']['lr'])
+        else:
+            raise ValueError(f"Optimizer {self.config['optimizer']['name']} not recognized.")
+        return optimizer
+      
     def _init_params(self):
 
         self.loader_train = data.DataLoader(self.train_dataset,

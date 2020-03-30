@@ -1,5 +1,6 @@
 
 from semichar_rnn import SemiCharRNN
+from torch import nn
 
 def get_model(model_name, dataset_params, n_hidden, n_layers, drop_prob, grad_clip):
   if model_name == "semichar_rnn":
@@ -9,3 +10,6 @@ def get_model(model_name, dataset_params, n_hidden, n_layers, drop_prob, grad_cl
   else:
     raise ValueError(f"Architecture with such name ({model_name}) is nt defined")
   return net
+
+def get_loss(loss):
+  return nn.CrossEntropyLoss()

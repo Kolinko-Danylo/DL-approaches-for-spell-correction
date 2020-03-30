@@ -18,7 +18,7 @@ class DataLoader(data.Dataset):
         self.root_path = root_path
         self.seq_legth = seq_length
         self.tokenized_data = self.tokenize(root_path)
-        self.tokenized_data = self.tokenized_data[:len(self.tokenized_data)//self.seq_legth]
+        self.tokenized_data = self.tokenized_data[:len(self.tokenized_data) - len(self.tokenized_data) % self.seq_legth]
         self.data = np.array(self.tokenized_data).reshape(-1, seq_length)
 
 
@@ -27,7 +27,7 @@ class DataLoader(data.Dataset):
 
         # encoded = np.array([char2int[ch] for ch in text])
         self.words = tuple(set(self.tokenized_data))
-        self.int2word = dict(enumerate(words))
+        self.int2word = dict(enumerate(self.words))
         self.word2int = {ch: ii for ii, ch in self.int2word.items()}
 
 
