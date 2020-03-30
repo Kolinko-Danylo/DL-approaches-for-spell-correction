@@ -5,7 +5,7 @@ from torch.utils import data
 import numpy as np
 import yaml
 import logging
-from model.utils import get_model, get_loss
+from model.model_utils import get_model, get_loss
 from dataload.dataloader import DataLoader
 from metric_counter import MetricCounter
 import os
@@ -15,7 +15,11 @@ class Trainer(object):
     def __init__(self, config):
         self.config = config
         self.dataset = self._get_dataset(config["dataroot"], config["seq_length"])
-        self.train_dataset, self.val_dataset, self.test_dataset = data.random_split(self.dataset, [0.8, 0.1, 0.1])
+        dlen = len(self.dataset)
+        splitlen = [int(0.8*dlen), int(0.1*dlen), 0]
+        splitlen[2] = dlen - sum(splitlen)
+        
+        self.train_dataset, self.val_dataset, self.test_dataset = data.random_split(self.dataset, splitlen)
 
         self.experiment_name = f"{config['experiment_desc']}_{config['model']['model_n']}"
         self.metric_counter = MetricCounter(self.experiment_name, self.config["print_every"])
@@ -55,7 +59,7 @@ class Trainer(object):
 
             self.metric_counter.add_losses(loss)
 
-            if counter %% self.config['print_every']:
+            if counter % self.config['print_every']:
               print(f"Epoch: {epoch}; Train Step: {counter}: {metric_counter.loss_message()}")
 
           
@@ -80,7 +84,7 @@ class Trainer(object):
             loss = self.loss_fn(output, y.view(self.config['batch_size']*self.config['seq_length']).long())
 
             self.metric_counter.add_losses(loss)
-            if counter %% self.config['print_every']:
+            if counter % self.config['print_every']:
               print(f"Epoch: {epoch}; Valid Step: {counter}: {metric_counter.loss_message()}")
             counter += 1
 
@@ -124,7 +128,7 @@ class Trainer(object):
 
 
 if __name__ == '__main__':
-    with open('config/comet_segm.yaml', 'r') as f:
+    with open('config/params.yaml', 'r') as f:
         config = yaml.load(f)
 
     trainer = Trainer(config)

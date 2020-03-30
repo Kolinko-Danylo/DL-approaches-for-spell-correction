@@ -1,5 +1,5 @@
 
-from semichar_rnn import SemiCharRNN
+from model.semichar_rnn import SemiCharRNN
 from torch import nn
 
 def get_model(model_name, dataset_params, n_hidden, n_layers, drop_prob, grad_clip):

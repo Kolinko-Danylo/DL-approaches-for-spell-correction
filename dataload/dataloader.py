@@ -8,6 +8,7 @@ import spacy
 import gensim
 from gensim.models.wrappers import FastText
 from torch.utils import data
+import string
 
 
 
@@ -25,7 +26,6 @@ class DataLoader(data.Dataset):
         self.int2char = dict(enumerate(self.chars))
         self.char2int = {ch: ii for ii, ch in self.int2char.items()}
 
-        # encoded = np.array([char2int[ch] for ch in text])
         self.words = tuple(set(self.tokenized_data))
         self.int2word = dict(enumerate(self.words))
         self.word2int = {ch: ii for ii, ch in self.int2word.items()}
@@ -41,7 +41,7 @@ class DataLoader(data.Dataset):
 
         x = spacy_nlp(text, disable=['parser', 'tagger', 'ner'])
         splitted = [token.text for token in x if
-                    not (token.text.isspace() or (token.text[0].isdigit() and token.text[-1].isdigit()))]
+                    not (token.text.isspace() or (token.text[0].isdigit() and token.text[-1].isdigit()) or (token.text[0] in string.punctuation and token.text[-1] in string.punctuation))]
         return splitted
 
     def one_hot_encode(self, arr, n_labels):
@@ -60,8 +60,8 @@ class DataLoader(data.Dataset):
 
     def augment(self, arr):
         augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0,
-                                 aug_word_max=arr.size // 3, special_char=False)
-        augmented_data = augmentator.augment(" ".join(arr.ravel().tolist())).split()
+                                 aug_word_max=arr.size // 3, special_char=False, tokenizer = lambda x: x.split(), reverse_tokenizer = lambda x: x)
+        augmented_data = augmentator.augment(" ".join(arr.ravel().tolist()))
         return np.array(augmented_data).reshape(arr.shape)
 
     def get_encodes(self, arr):
@@ -98,7 +98,7 @@ class DataLoader(data.Dataset):
       return param_dict
 
     def __len__(self):
-        return len(self.tokenized_data)
+        return np.shape(self.data)[0]
 
     def __getitem__(self, index):
         sequence = self.data[index]
