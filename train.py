@@ -9,7 +9,7 @@ from model.model_utils import get_model, get_loss
 from dataload.dataloader import DataLoader
 from metric_counter import MetricCounter
 import os
-
+from torch import nn
 
 class Trainer(object):
     def __init__(self, config):
@@ -25,7 +25,9 @@ class Trainer(object):
         self.metric_counter = MetricCounter(self.experiment_name, self.config["print_every"])
 
     def train(self):
+      
         self._init_params()
+        self.model.cuda()
         for epoch in range(0, self.epochs):
             self._run_epoch(epoch)
             self._validate(epoch)
@@ -42,7 +44,7 @@ class Trainer(object):
                 f"Experiment Name: {self.config['experiment_desc']}, Epoch: {epoch}, Loss: {self.metric_counter.loss_message()}")
 
     def _run_epoch(self, epoch):
-
+        
         self.metric_counter.clear()
         h = None
         counter = 0 
@@ -51,16 +53,21 @@ class Trainer(object):
 
             self.optimizer.zero_grad()
             output, h = self.model(X, h)
-            loss = self.loss_fn(output, y.view(self.config['batch_size']*self.config['seq_length']).long())
             
+            loss = self.loss_fn(output, y.view(y.nelement()).long())
             loss.backward()
-            nn.utils.clip_grad_norm_(net.parameters(), self.config['clip'])
+            
+
+            h = tuple([i.detach_() for i in h])
+            acc = self.calc_acc(output, y.view(y.nelement()))
+
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.config['clip'])
             self.optimizer.step()
 
             self.metric_counter.add_losses(loss)
-
-            if counter % self.config['print_every']:
-              print(f"Epoch: {epoch}; Train Step: {counter}: {metric_counter.loss_message()}")
+            self.metric_counter.add_acc(acc)
+            if not counter % self.config['print_every']:
+              print(f"Epoch: {epoch}; Train Step: {counter}: {self.metric_counter.loss_message()}")
 
           
           
@@ -73,6 +80,7 @@ class Trainer(object):
     
             
     def _validate(self, epoch):
+        h = None
         self.model.eval()
         self.metric_counter.clear()
         counter = 0
@@ -81,15 +89,22 @@ class Trainer(object):
             X, y = X.cuda(), y.cuda()
             output, h = self.model(X, h)
 
-            loss = self.loss_fn(output, y.view(self.config['batch_size']*self.config['seq_length']).long())
+            loss = self.loss_fn(output, y.view(y.nelement()).long())
+            acc = self.calc_acc(output, y.view(y.nelement()))
 
             self.metric_counter.add_losses(loss)
-            if counter % self.config['print_every']:
-              print(f"Epoch: {epoch}; Valid Step: {counter}: {metric_counter.loss_message()}")
+            self.metric_counter.add_acc(acc)
+            if not counter % self.config['print_every']:
+              print(f"Epoch: {epoch}; Valid Step: {counter}: {self.metric_counter.loss_message()}")
             counter += 1
 
         self.metric_counter.write_to_tensorboard(epoch, validation=True)
         self.model.train()
+    
+    def calc_acc(self, y_pred, y):
+        acc_output = y_pred.cpu().detach().numpy().astype("int32")
+        acc =  np.equal(acc_output.argmax(1), y.cpu().numpy())
+        return acc.sum()/acc_output.shape[0]
 
   
     def _get_dataset(self, dataroot, seq_length):

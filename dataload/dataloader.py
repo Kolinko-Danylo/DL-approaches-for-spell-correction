@@ -65,14 +65,14 @@ class DataLoader(data.Dataset):
         return np.array(augmented_data).reshape(arr.shape)
 
     def get_encodes(self, arr):
-        arr = self.augment(arr).ravel()
+        arr = self.augment(arr)
 
-        flat_arr = arr
+        flat_arr = arr.ravel()
         splitted_encoded = np.array(list(map(lambda x: np.array([self.char2int[ch] for ch in x]), flat_arr)))
 
         first_char = list(map(lambda x: x[0], splitted_encoded))
         last_char = list(map(lambda x: x[-1], splitted_encoded))
-        middle = splitted_encoded.tolist()
+        middle = splitted_encoded
 
         first_char_encoded = self.one_hot_encode(np.array(first_char), len(self.chars))
         last_char_encoded = self.one_hot_encode(np.array(last_char), len(self.chars))

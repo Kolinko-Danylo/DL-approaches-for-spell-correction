@@ -1,4 +1,4 @@
-batch_size: 50
+batch_size: 100
 clip: 5
 dataroot: data/big.txt
 experiment_desc: test_model
@@ -8,4 +8,4 @@ num_epochs: 20
 optimizer: {lr: 0.003, name: adam}
 print_every: 100
 seq_lenght: 50
-seq_length: 10
+seq_length: 6
