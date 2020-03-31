@@ -24,9 +24,10 @@ class MetricCounter():
     def add_acc(self, acc):
         self.acc.append(acc)
 
-    def loss_message(self):
-        mean_loss = np.mean(self.loss[-self.print_every:])
-        mean_acc = np.mean(self.acc[-self.print_every:])
+    def loss_message(self, full=False):
+        k = 0 if full else -self.print_every
+        mean_loss = np.mean(self.loss[k:])
+        mean_acc = np.mean(self.acc[k:])
         return f'loss={round(mean_loss, 3)}; acc={mean_acc};'
 
     def write_to_tensorboard(self, epoch_num, validation=False):

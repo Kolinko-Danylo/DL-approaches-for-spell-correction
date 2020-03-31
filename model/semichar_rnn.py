@@ -17,7 +17,7 @@ class SemiCharRNN(nn.Module):
         
         
         self.rnn = nn.LSTM(3*len(self.dataset_params["chars"]), n_hidden, n_layers, 
-                            dropout=drop_prob, batch_first=True)
+                            dropout=drop_prob)
         
         self.dropout = nn.Dropout(drop_prob)
         

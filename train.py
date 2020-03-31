@@ -24,6 +24,12 @@ class Trainer(object):
         self.experiment_name = f"{config['experiment_desc']}_{config['model']['model_n']}"
         self.metric_counter = MetricCounter(self.experiment_name, self.config["print_every"])
 
+    def test(self):
+      PATH = f'model/pretrained/best_{self.config["experiment_desc"]}.pth'
+      self.model.load_state_dict(torch.load(PATH)['model'])
+      self.model.eval()
+      self._validate(-1, True)
+
     def train(self):
       
         self._init_params()
@@ -37,7 +43,7 @@ class Trainer(object):
                     'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
                     'dataset_params': self.dataset.get_params()
-                }, f'best_{self.config["experiment_desc"]}.pth')
+                }, f'model/pretrained/best_{self.config["experiment_desc"]}.pth')
 
             print(self.metric_counter.loss_message())
             logging.debug(
@@ -68,7 +74,6 @@ class Trainer(object):
             self.metric_counter.add_acc(acc)
             if not counter % self.config['print_every']:
               print(f"Epoch: {epoch}; Train Step: {counter}: {self.metric_counter.loss_message()}")
-
           
           
             counter += 1
@@ -79,13 +84,14 @@ class Trainer(object):
         
     
             
-    def _validate(self, epoch):
+    def _validate(self, epoch, test=False):
         h = None
         self.model.eval()
         self.metric_counter.clear()
         counter = 0
+        loader = (self.loader_test if test else self.loader_val)
 
-        for X, y in self.loader_val:
+        for X, y in loader:
             X, y = X.cuda(), y.cuda()
             output, h = self.model(X, h)
 
@@ -97,8 +103,12 @@ class Trainer(object):
             if not counter % self.config['print_every']:
               print(f"Epoch: {epoch}; Valid Step: {counter}: {self.metric_counter.loss_message()}")
             counter += 1
-
-        self.metric_counter.write_to_tensorboard(epoch, validation=True)
+        
+        if not test:
+          self.metric_counter.write_to_tensorboard(epoch, validation=True)
+        else:
+          print(self.metric_counter.loss_message())
+        
         self.model.train()
     
     def calc_acc(self, y_pred, y):
@@ -127,6 +137,10 @@ class Trainer(object):
         self.loader_val = data.DataLoader(self.val_dataset,
                                           batch_size=self.config['batch_size'],
                                           shuffle=False)
+
+        self.loader_test = data.DataLoader(self.test_dataset,
+                                          batch_size=self.config['batch_size'],
+                                          shuffle=False)
                                           
         self.model = get_model(self.config['model']['model_n'],
                                self.dataset.get_params(),
@@ -148,3 +162,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(config)
     trainer.train()
+    trainer.test()
