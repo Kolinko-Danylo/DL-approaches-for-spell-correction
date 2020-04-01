@@ -185,9 +185,7 @@ class seq2seqDataset(data.Dataset):
         len_vec, res_arr = padded_encode(seq)  
 
                   
-        
-        # len_vec, perm_idx = torch.from_numpy(len_vec).sort(0, descending=True)
-        # res_arr = res_arr[perm_idx]
+      
 
         return len_vec, res_arr
 
@@ -202,77 +200,6 @@ class seq2seqDataset(data.Dataset):
         
         return tuple([torch.from_numpy(arr) for arr in (lengths_x, X, lengths_y, Y)])
 
-
-
-# def get_encodes(arr, seq_length, use_aug=False):
-#   if use_aug:
-#     aug_rr = nac.KeyboardAug(aug_char_min=0, aug_char_max=None, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0, aug_word_max=arr.size//3, special_char=False)
-    
-#     augmented_data = list(map(lambda x: aug_rr.augment(x), arr.ravel()))
-#     arr = np.array(augmented_data).reshape(arr.shape)
-#   flat_arr = arr.ravel()
-
-#   def padded_encode(x):
-#     k = np.full((seq_length,), bpemb_en.vs)
-#     enc = np.array(bpemb_en.encode_ids(x))
-#     k[:enc.size] = enc
-
-
-#     return enc.size, k
-
-#   res_arr = np.empty((*flat_arr.shape, seq_length), dtype="int32")
-#   len_vec = np.empty( (arr.shape[0]))
-#   for i in range(flat_arr.size):
-
-#     res = padded_encode(flat_arr[i])  
-#     res_arr[i] = res[1]
-#     len_vec[i] = res[0]
-
-#   if not use_aug:
-#     res_arr = np.insert(res_arr, 0, 1, 1)
-#   len_vec, perm_idx = torch.from_numpy(len_vec).sort(0, descending=True)
-#   res_arr = res_arr[perm_idx]
-
-#   leng, res = len_vec, one_hot_encode(res_arr, bpemb_en.vs + 1)
-
-#   leng += (1 if not use_aug else 0)
-#   leng, res = leng, torch.from_numpy(res)
-
-#   return leng, res
-
-# def get_batches(arr, batch_size, seq_length):
-#     '''Create a generator that returns batches of size
-#        batch_size x seq_length from arr.
-       
-#        Arguments
-#        ---------
-#        arr: Array you want to make batches from
-#        batch_size: Batch size, the number of sequences per batch
-#        seq_length: Number of encoded chars in a sequence
-#     '''
-    
-#     # total number of batches we can make
-#     n_batches = len(arr)//batch_size
-    
-#     # Keep only enough characters to make full batches
-#     arr = arr[:n_batches * batch_size]    
-
-  
-
-#     # Reshape into batch_size rows
-#     arr = arr.reshape((batch_size, -1))
-#     # iterate through the array, one sequence at a time
-#     for n in range(0, arr.shape[1]):
-#         # The features
-#         base = arr[:, n:n+1]
-#         # y = np.vectorize(get_int)(base)
-
-#         x = base.copy()
-#         # y = one_hot_encode(y, len(words))
-#         lengths_x, x = get_encodes(x, seq_length, use_aug=True)
-#         lengths_y, y = get_encodes(base, seq_length)
-        
-#         yield lengths_x, x, lengths_y, y
 
 if __name__ == '__main__':
     ds = seq2seqDataset("data/big.txt", 40, 1000, 50)

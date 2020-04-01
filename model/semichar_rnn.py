@@ -17,7 +17,7 @@ class SemiCharRNN(nn.Module):
         
         
         self.rnn = nn.LSTM(3*len(self.dataset_params["chars"]), n_hidden, n_layers, 
-                            dropout=drop_prob)
+                            dropout=drop_prob, batch_first=True)
         
         self.dropout = nn.Dropout(drop_prob)
         
@@ -36,17 +36,3 @@ class SemiCharRNN(nn.Module):
         
         return out, hidden
     
-    
-    # def init_hidden(self, batch_size):
-    #     ''' Initializes hidden state '''
-
-    #     weight = next(self.parameters()).data
-        
-    #     if (train_on_gpu):
-    #         hidden = (weight.new(self.n_layers, batch_size, self.n_hidden).zero_().cuda(),
-    #               weight.new(self.n_layers, batch_size, self.n_hidden).zero_().cuda())
-    #     else:
-    #         hidden = (weight.new(self.n_layers, batch_size, self.n_hidden).zero_(),
-    #                   weight.new(self.n_layers, batch_size, self.n_hidden).zero_())
-        
-    #     return hidden

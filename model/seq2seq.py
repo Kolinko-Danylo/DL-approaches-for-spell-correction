@@ -78,24 +78,20 @@ class Attn(nn.Module):
 
 
 class LuongAttnDecoderRNN(nn.Module):
-    def __init__(self, attn_model, input_size, hidden_size, output_size, n_layers=1, dropout=0.1):
+    def __init__(self, attn_model, input_size, hidden_size, n_layers=1, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
 
         # Keep for reference
         self.attn_model = attn_model
         self.hidden_size = hidden_size
-        self.output_size = output_size
+        self.output_size = input_size
         self.n_layers = n_layers
         self.dropout = dropout
 
-        # Define layers
-        self.embedding = nn.Embedding(output_size, hidden_size)
-        self.embedding_dropout = nn.Dropout(dropout)
         self.gru = nn.GRU(input_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
         self.concat = nn.Linear(hidden_size * 2, hidden_size)
         self.out = nn.Linear(hidden_size, output_size)
         
-        # Choose attention model
         if attn_model != 'none':
             self.attn = Attn(attn_model, hidden_size)
 
@@ -121,3 +117,33 @@ class LuongAttnDecoderRNN(nn.Module):
 
         # Return final output, hidden state, and attention weights (for visualization)
         return output, hidden, attn_weights
+
+
+class AttentionEncoderDecoder():
+    def __init__(self, input_size, hidden_size, n_layers, attn_model)
+        self.encoder = EncoderRNN(input_size, hidden_size, n_layers)
+        self.decoder = LuongAttnDecoderRNN(attn_model, input_size, hidden_size, n_layers)
+        
+    def forward(self, hidden, lenX, X, leny, y):
+        max_target_length = int(max(leny).item())
+        decoder_input = y[:, :1]
+
+        all_decoder_outputs = torch.zeros(batch_size, max_target_length, decoder.output_size)
+
+
+        # Run through decoder one time step at a time
+        encoder_outputs, encoder_hidden = self.encoder(X, lenX, h)
+
+        decoder_hidden = encoder_hidden[:self.decoder.n_layers]
+
+        for t in range(max_target_length):
+            decoder_output, decoder_hidden, decoder_attn = decoder(decoder_input, decoder_hidden, encoder_outputs)
+
+            all_decoder_outputs[:, t] = decoder_output
+            decoder_input = targets[:, t+1].unsqueeze(1) # Next input is current target
+
+        out = all_decoder_outputs
+        targets = targets[:, :out.size(1)]
+        tar = targets.argmax(2)
+        tar = tar.view(tar.size(0)*tar.size(1))
+        cur = out.view(out.size(0)*out.size(1), -1)
