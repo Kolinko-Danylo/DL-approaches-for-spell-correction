@@ -123,7 +123,9 @@ class seq2seqDataset(data.Dataset):
         self.seq_length = seq_length
         self.tokenized_data = self.tokenize(root_path)
         self.embed = BPEmb(lang="en", vs=embed_vec_space, add_pad_emb=True)
-
+        self.pad = -1
+        self.sos = -2
+        self.eos = -3
 
 
     def tokenize(self, root_path):
@@ -167,20 +169,21 @@ class seq2seqDataset(data.Dataset):
         
 
         def padded_encode(x):
-            res = np.full((self.seq_length, self.embed.dim), self.embed['<pad>'])
-            enc = self.embed.encode_ids(x)
             
-            res[:len(enc)] = self.embed.vectors[enc]
+            res = (np.full((self.seq_length, self.embed.dim), self.embed['<pad>']) if use_aug else  np.full((self.seq_length), self.pad))
+            enc = self.embed.encode_ids(x)
+
+            res[:len(enc)] = (self.embed.vectors[enc] if use_aug else np.array(enc))
             length = len(enc)
             
-            res = np.insert(res, 0, np.full((self.embed.dim), -1), 0)
+            res = (np.insert(res, 0, np.full((self.embed.dim), self.sos), 0) if use_aug else np.insert(res, 0, self.sos, 0))
             length += 1
 
             if use_aug:
-              res = np.insert(res, length, np.full((self.embed.dim), -2), 0)
+              res = np.insert(res, length, np.full((self.embed.dim), self.eos), 0)
               length += 1
 
-            return np.array([length]), res
+            return length, res
 
         len_vec, res_arr = padded_encode(seq)  
 
@@ -188,6 +191,8 @@ class seq2seqDataset(data.Dataset):
       
 
         return len_vec, res_arr
+    def get_params(self):
+        return None 
 
     def __len__(self):
         return len(self.tokenized_data)
@@ -198,7 +203,7 @@ class seq2seqDataset(data.Dataset):
         lengths_x, X = self.get_encodes(sequence, use_aug=True)
         lengths_y, Y = self.get_encodes(sequence)
         
-        return tuple([torch.from_numpy(arr) for arr in (lengths_x, X, lengths_y, Y)])
+        return lengths_x, torch.from_numpy(X), lengths_y, torch.from_numpy(Y)
 
 
 if __name__ == '__main__':

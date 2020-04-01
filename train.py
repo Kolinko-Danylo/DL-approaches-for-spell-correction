@@ -6,7 +6,7 @@ import numpy as np
 import yaml
 import logging
 from model.model_utils import get_model, get_loss
-from dataload.dataloader import DataLoader
+from dataload.dataloader import seq2seqDataset, SemicharDataset
 from metric_counter import MetricCounter
 import os
 from torch import nn
@@ -36,9 +36,13 @@ class Trainer(object):
         self.model.cuda()
         
         for epoch in range(0, self.epochs):
-            self._run_epoch(epoch)
-            self._validate(epoch)
-
+            if self.config['model']['model_n'] == "semichar_rnn":
+                self._run_epoch(epoch)
+                self._validate(epoch)
+            if self.config['model']['model_n'] == "seq2seq+attention":
+                self._run_epoch_seq2seq(epoch)
+                self._validate_seq2seq(epoch)
+            
             if self.metric_counter.update_best_model():
                 torch.save({
                     'model': self.model.state_dict(),
@@ -52,7 +56,6 @@ class Trainer(object):
 
 
 # def train(encoder, decoder, data, epochs=10, batch_size=30, seq_length=500, hidden_size=1000, lr=0.001, clip=5, val_frac=0.1, print_every=10):
-    
 #     counter = 0
 
 #     for e in range(epochs):
@@ -99,26 +102,14 @@ class Trainer(object):
 #             out = all_decoder_outputs
 #             targets = targets[:, :out.size(1)]
 #             tar = targets.argmax(2)
-#             tar = tar.view(tar.size(0)*tar.size(1))
+              # tar = y.view(y.size(0)*y.size(1))
 #             cur = out.view(out.size(0)*out.size(1), -1)
+              
 
 
 
 
-#             loss = criterion(cur, tar)
-#             training_loss.append(loss.item())
 
-
-#             # calculate the loss and perform backprop
-#             # loss = criterion(output, targets.view(batch_size*seq_length).long())
-#             loss.backward()
-#             nn.utils.clip_grad_norm_(decoder.parameters(), clip)
-#             nn.utils.clip_grad_norm_(encoder.parameters(), clip)
-#             opt2.step()
-#             opt1.step()
-            
-            
-#             # loss stats
 #             if counter % print_every == 0:
 #                     # Get validation loss
 #                 val_h = None
@@ -196,12 +187,15 @@ class Trainer(object):
 #                     div = nb_tokens
 #                     val_acc.append(current_accuracy/(div))
 #                     validation_accuracy.append(current_accuracy/(div))
+    
     def _run_epoch_seq2seq(self, epoch):
         self.metric_counter.clear()
-        h = None
+        
         counter = 0 
         for lenX, X, leny, y in self.loader_train:
-            lenX, perm_idx = torch.from_numpy(lenX).sort(0, descending=True)
+
+            h = None
+            lenX, perm_idx = lenX.sort(0, descending=True)
             X = X[perm_idx]
             y = y[perm_idx]
             leny = leny[perm_idx]
@@ -210,6 +204,64 @@ class Trainer(object):
             lenX, leny = lenX.cuda(), leny.cuda()
 
             self.optimizer.zero_grad()
+            cur, tar = self.model(h, lenX, X, leny, y)
+            
+            loss = self.loss_fn(cur, tar)
+
+            loss.backward()
+            h = tuple([i.detach_() for i in h])
+            acc = self.calc_acc(cur, y.view(y.nelement()))
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.config['clip'])
+            self.optim.step()
+
+            self.metric_counter.add_losses(loss)
+            self.metric_counter.add_acc(acc)
+            if not counter % self.config['print_every']:
+                print(f"Epoch: {epoch}; Train Step: {counter}: {self.metric_counter.loss_message()}")
+          
+          
+            counter += 1
+
+        
+        self.metric_counter.write_to_tensorboard(epoch)
+            
+    def _validate_seq2seq(self, epoch):
+        self.metric_counter.clear()
+
+        counter = 0 
+        self.model.eval()
+        loader = self.loader_test
+        for lenX, X, leny, y in loader:
+            h = None
+            lenX, perm_idx = lenX.sort(0, descending=True)
+            X = X[perm_idx]
+            y = y[perm_idx]
+            leny = leny[perm_idx]
+
+            X, y = X.cuda(), y.cuda()
+            lenX, leny = lenX.cuda(), leny.cuda()
+
+            cur, tar = self.model(h, lenX, X, leny, y)
+            
+            loss = self.loss_fn(cur, tar)
+
+            acc = self.calc_acc(cur, y.view(y.nelement()))
+
+            self.metric_counter.add_losses(loss)
+            self.metric_counter.add_acc(acc)
+            if not counter % self.config['print_every']:
+                print(f"Epoch: {epoch}; Valid Step: {counter}: {self.metric_counter.loss_message()}")
+          
+          
+            counter += 1
+
+        
+        self.metric_counter.write_to_tensorboard(epoch, validation=True)
+        print(self.metric_counter.loss_message())
+        
+        self.model.train()
+            
+
 
             
 
@@ -283,7 +335,10 @@ class Trainer(object):
 
   
     def _get_dataset(self, dataroot, seq_length):
-        return DataLoader(dataroot, seq_length)
+        if self.config['model']['model_n'] == "semichar_rnn":
+            return SemicharDataset(dataroot, seq_length)
+        if self.config['model']['model_n'] == "seq2seq+attention":
+            return seq2seqDataset(dataroot, seq_length, 50, 1000)
 
     def _get_optim(self, params):
         if self.config['optimizer']['name'] == 'adam':
@@ -312,7 +367,9 @@ class Trainer(object):
                                self.config['model']['n_hidden'],
                                self.config['model']['n_layers'],
                                self.config['model']['drop_prob'],
-                               self.config['model']['grad_clip'])
+                               self.config['model']['grad_clip'],
+                               self.config['model']['attn_model'],
+                               self.config['model']['n_input'])
 
         self.epochs = self.config['num_epochs']
         self.optimizer = self._get_optim(self.model.parameters())
@@ -327,4 +384,3 @@ if __name__ == '__main__':
 
     trainer = Trainer(config)
     trainer.train()
-    trainer.test()

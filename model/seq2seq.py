@@ -82,6 +82,7 @@ class LuongAttnDecoderRNN(nn.Module):
         super(LuongAttnDecoderRNN, self).__init__()
 
         # Keep for reference
+        self.input_size = input_size
         self.attn_model = attn_model
         self.hidden_size = hidden_size
         self.output_size = input_size
@@ -89,8 +90,8 @@ class LuongAttnDecoderRNN(nn.Module):
         self.dropout = dropout
 
         self.gru = nn.GRU(input_size, hidden_size, n_layers, dropout=dropout, batch_first=True)
-        self.concat = nn.Linear(hidden_size * 2, hidden_size)
-        self.out = nn.Linear(hidden_size, output_size)
+        self.concat = nn.Linear(self.hidden_size * 2, self.hidden_size)
+        self.out = nn.Linear(self.hidden_size, self.output_size)
         
         if attn_model != 'none':
             self.attn = Attn(attn_model, hidden_size)
@@ -99,8 +100,6 @@ class LuongAttnDecoderRNN(nn.Module):
 
         rnn_output, hidden = self.gru(input_seq, last_hidden)
 
-        # Calculate attention from current RNN state and all encoder outputs;
-        # apply to encoder outputs to get weighted average
         attn_weights = self.attn(rnn_output, encoder_outputs)
         context = attn_weights.bmm(encoder_outputs) # B x S=1 x N
 
@@ -119,8 +118,9 @@ class LuongAttnDecoderRNN(nn.Module):
         return output, hidden, attn_weights
 
 
-class AttentionEncoderDecoder():
-    def __init__(self, input_size, hidden_size, n_layers, attn_model)
+class AttentionAutoencoder(nn.Module):
+    def __init__(self, input_size, hidden_size, n_layers, attn_model):
+        super().__init__()
         self.encoder = EncoderRNN(input_size, hidden_size, n_layers)
         self.decoder = LuongAttnDecoderRNN(attn_model, input_size, hidden_size, n_layers)
         
@@ -128,22 +128,26 @@ class AttentionEncoderDecoder():
         max_target_length = int(max(leny).item())
         decoder_input = y[:, :1]
 
-        all_decoder_outputs = torch.zeros(batch_size, max_target_length, decoder.output_size)
+        all_decoder_outputs = torch.zeros(X.size(0), max_target_length, self.decoder.output_size).cuda()
 
 
         # Run through decoder one time step at a time
-        encoder_outputs, encoder_hidden = self.encoder(X, lenX, h)
+        encoder_outputs, encoder_hidden = self.encoder(X, lenX, hidden)
 
         decoder_hidden = encoder_hidden[:self.decoder.n_layers]
 
         for t in range(max_target_length):
-            decoder_output, decoder_hidden, decoder_attn = decoder(decoder_input, decoder_hidden, encoder_outputs)
+            decoder_output, decoder_hidden, decoder_attn = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
 
             all_decoder_outputs[:, t] = decoder_output
             decoder_input = targets[:, t+1].unsqueeze(1) # Next input is current target
 
         out = all_decoder_outputs
-        targets = targets[:, :out.size(1)]
-        tar = targets.argmax(2)
+        tar = y[:, :out.size(1)]
         tar = tar.view(tar.size(0)*tar.size(1))
         cur = out.view(out.size(0)*out.size(1), -1)
+        return cur, tar
+
+if __name__ == '__main__':
+    ds = AttentionAutoencoder(1003, 300, 2, 'general')
+    print("here")
