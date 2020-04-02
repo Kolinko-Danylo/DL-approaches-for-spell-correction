@@ -31,6 +31,9 @@ class SemicharDataset(data.Dataset):
         self.words = tuple(set(self.tokenized_data))
         self.int2word = dict(enumerate(self.words))
         self.word2int = {ch: ii for ii, ch in self.int2word.items()}
+        self.augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0,
+                                 aug_word_max= int(0.7*self.seq_length), special_char=False, tokenizer = lambda x: x.split(), reverse_tokenizer = lambda x: x)
+        
 
 
     def tokenize(self, root_path):
@@ -61,9 +64,7 @@ class SemicharDataset(data.Dataset):
         return np.sum(self.one_hot_encode(word[1:-1], n_labels), axis=0)
 
     def augment(self, arr):
-        augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0,
-                                 aug_word_max=arr.size // 3, special_char=False, tokenizer = lambda x: x.split(), reverse_tokenizer = lambda x: x)
-        augmented_data = augmentator.augment(" ".join(arr.ravel().tolist()))
+        augmented_data = self.augmentator.augment(" ".join(arr.ravel().tolist()))
         return np.array(augmented_data).reshape(arr.shape)
 
     def get_encodes(self, arr):
@@ -127,6 +128,10 @@ class seq2seqDataset(data.Dataset):
         self.sos = 1001
         self.eos = 1000
 
+        self.augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.5, aug_word_min=0,
+                                 aug_word_max=self.seq_length // 5, special_char=False)
+        
+
 
     def tokenize(self, root_path):
   
@@ -141,15 +146,26 @@ class seq2seqDataset(data.Dataset):
         while True:
 
           flag = (1 if self.seq_length >= lt - start else 0)
+          if lt <= start:
+            break
           cur_text = text[start: start + min(self.seq_length, lt - start)]
-          last_chunk_len = (0 if cur_text[-1].isspace() else len(cur_text.split()[-1]))
-          
+          last_chunk_len = None
+          try:
+            last_chunk_len = (0 if cur_text[-1].isspace() else len(cur_text.split()[-1]))
+          except:
+            print(cur_text)
+            start += self.seq_length
+            continue
           start += self.seq_length - last_chunk_len
 
           if last_chunk_len == len(cur_text.strip()):
             start += self.seq_length
             continue
-          splitted.append(cur_text[:-last_chunk_len].strip())
+          st = cur_text[:-last_chunk_len].strip()
+          if st == st.swapcase():
+            start += self.seq_length
+            continue
+          splitted.append(st)
 
           if flag:
             break
@@ -166,10 +182,8 @@ class seq2seqDataset(data.Dataset):
 
         # return one_hot
     def augment(self, seq):
-        augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.5, aug_word_min=0,
-                                 aug_word_max=len(seq) // 5, special_char=False)
 
-        augmented_data = augmentator.augment(seq)
+        augmented_data = self.augmentator.augment(seq)
         return seq
 
     def get_encodes(self, seq, use_aug=False):

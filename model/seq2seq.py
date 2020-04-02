@@ -137,6 +137,7 @@ class AttentionAutoencoder(nn.Module):
         decoder_hidden = encoder_hidden[:self.decoder.n_layers]
 
         for t in range(max_target_length):
+
             decoder_output, decoder_hidden, decoder_attn = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
 
             all_decoder_outputs[:, t] = decoder_output
