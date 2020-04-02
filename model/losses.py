@@ -8,24 +8,25 @@ def loss(Y_hat, Y):
         # and calculate the loss on that.
 
         # flatten all the labels
-        Y = Y.view(-1)
+        Y = Y.view(-1).long()
 
         # flatten all predictions
         Y_hat = Y_hat.view(-1, Y_hat.size(-1))
 
         # create a mask by filtering out all tokens that ARE NOT the padding token
         tag_pad_token = 1000
-        mask = (Y < tag_pad_token).float()
+        mask = (Y < tag_pad_token)
 
         # count how many tokens we have
         nb_tokens = int(torch.sum(mask).item())
 
         # pick the values for the label and zero out the rest with the mask
-        Y_hat = Y_hat[range(Y_hat.shape[0]), Y] * mask
+        Y_hat = Y_hat[:, Y] * mask
 
         # compute cross entropy loss which ignores all <PAD> tokens
         ce_loss = -torch.sum(Y_hat) / nb_tokens
 
         return ce_loss
+
 def masked_ce_loss():
   return loss

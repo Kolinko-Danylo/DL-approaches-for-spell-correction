@@ -123,9 +123,9 @@ class seq2seqDataset(data.Dataset):
         self.seq_length = seq_length
         self.tokenized_data = self.tokenize(root_path)
         self.embed = BPEmb(lang="en", vs=embed_vec_space, add_pad_emb=True)
-        self.pad = -1
-        self.sos = -2
-        self.eos = -3
+        self.pad = 1002
+        self.sos = 1001
+        self.eos = 1000
 
 
     def tokenize(self, root_path):
@@ -155,7 +155,16 @@ class seq2seqDataset(data.Dataset):
             break
 
         return splitted
+    # def one_hot_encode(self, arr, n_labels):
+    #     one_hot = np.zeros((arr.size, n_labels), dtype=np.float32)
 
+    #     # Fill the appropriate elements with ones
+    #     one_hot[np.arange(one_hot.shape[0]), arr.flatten()] = 1.
+
+    #     # Finally reshape it to get back to the original array
+    #     one_hot = one_hot.reshape((*arr.shape, n_labels))
+
+        # return one_hot
     def augment(self, seq):
         augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.5, aug_word_min=0,
                                  aug_word_max=len(seq) // 5, special_char=False)
@@ -170,27 +179,30 @@ class seq2seqDataset(data.Dataset):
 
         def padded_encode(x):
             
-            res = (np.full((self.seq_length, self.embed.dim), self.embed['<pad>']) if use_aug else  np.full((self.seq_length), self.pad))
+            res = np.full((self.seq_length, self.embed.dim), self.embed['<pad>']) 
+            res1hot = np.full((self.seq_length), self.pad, dtype=np.int32)
             enc = self.embed.encode_ids(x)
 
-            res[:len(enc)] = (self.embed.vectors[enc] if use_aug else np.array(enc))
+            res[:len(enc)] = self.embed.vectors[enc]  
+            res1hot[:len(enc)] = np.array(enc)
             length = len(enc)
             
-            res = (np.insert(res, 0, np.full((self.embed.dim), self.sos), 0) if use_aug else np.insert(res, 0, self.sos, 0))
+            res = np.insert(res, 0, np.full((self.embed.dim), self.sos), 0)  
+            
             length += 1
-
             if use_aug:
               res = np.insert(res, length, np.full((self.embed.dim), self.eos), 0)
-              length += 1
+              length += 1             
 
-            return length, res
-
-        len_vec, res_arr = padded_encode(seq)  
+              return length, res
+            res1hot = np.insert(res1hot, length, self.eos, 0)
+            return length, res, res1hot
+  
 
                   
       
 
-        return len_vec, res_arr
+        return padded_encode(seq)
     def get_params(self):
         return None 
 
@@ -201,9 +213,9 @@ class seq2seqDataset(data.Dataset):
         sequence = self.tokenized_data[index]
         
         lengths_x, X = self.get_encodes(sequence, use_aug=True)
-        lengths_y, Y = self.get_encodes(sequence)
+        lengths_y, Y, y1hot = self.get_encodes(sequence)
         
-        return lengths_x, torch.from_numpy(X), lengths_y, torch.from_numpy(Y)
+        return lengths_x, torch.from_numpy(X), lengths_y, torch.from_numpy(Y), torch.from_numpy(y1hot)
 
 
 if __name__ == '__main__':

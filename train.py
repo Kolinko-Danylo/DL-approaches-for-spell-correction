@@ -53,166 +53,36 @@ class Trainer(object):
             print(self.metric_counter.loss_message())
             logging.debug(
                 f"Experiment Name: {self.config['experiment_desc']}, Epoch: {epoch}, Loss: {self.metric_counter.loss_message()}")
-
-
-# def train(encoder, decoder, data, epochs=10, batch_size=30, seq_length=500, hidden_size=1000, lr=0.001, clip=5, val_frac=0.1, print_every=10):
-#     counter = 0
-
-#     for e in range(epochs):
-#         # initialize hidden state
-#         h = None
-
-#         for lenx, x, leny, y in get_batches(data, batch_size=batch_size, seq_length=seq_length):
-#           try:
-#             counter += 1
-#                         # One-hot encode our data and make them Torch tensors
-#             lenx, leny = lenx.cuda(), leny.cuda()
-#             inputs, targets = x.cuda(), y.cuda()
-
-#             # Creating new variables for the hidden state, otherwise
-#             # we'd backprop through the entire training history
-#             h = None
-
-#             # zero accumulated gradients
-#             encoder.zero_grad()
-#             decoder.zero_grad()
-            
-#             max_target_length = int(max(leny).item())
-#             decoder_input = targets[:, :1]
-
-#             all_decoder_outputs = torch.zeros(batch_size, max_target_length, decoder.output_size)
-
-#             decoder_input = decoder_input.cuda()
-#             all_decoder_outputs = all_decoder_outputs.cuda()
-
-#             # Run through decoder one time step at a time
-#             encoder_outputs, encoder_hidden = encoder(inputs, lenx, h)
-
-#             decoder_hidden = encoder_hidden[:decoder.n_layers].cuda()
-
-#             for t in range(max_target_length):
-#                 decoder_output, decoder_hidden, decoder_attn = decoder(decoder_input, decoder_hidden, encoder_outputs)
-
-#                 all_decoder_outputs[:, t] = decoder_output
-#                 decoder_input = targets[:, t+1].unsqueeze(1) # Next input is current target
-#             # get the output from the model
-#             # h_dec = encoder_outputs
-#             # print("Encoder_hidden: ", encoder_hidden.size())
-#             # out, h_dec = decoder(targets[:, :-1], encoder_hidden[:decoder.n_layers], h_dec)
-#             out = all_decoder_outputs
-#             targets = targets[:, :out.size(1)]
-#             tar = targets.argmax(2)
-              # tar = y.view(y.size(0)*y.size(1))
-#             cur = out.view(out.size(0)*out.size(1), -1)
-              
-
-
-
-
-
-#             if counter % print_every == 0:
-#                     # Get validation loss
-#                 val_h = None
-#                 val_losses = []
-#                 val_acc = []
-#                 encoder.eval()
-#                 decoder.eval()
-
-#                 for lenx, x, leny, y in get_batches(val_data, batch_size=batch_size, seq_length=seq_length):
-
-#                         # One-hot encode our data and make them Torch tensors
-                        
-#                         # Creating new variables for the hidden state, otherwise
-#                         # we'd backprop through the entire training history
-#                     val_h = None
-                        
-#                     inputs, targets = x, y
-#                     inputs, targets = inputs.cuda(), targets.cuda()
-#                     lenx, leny = lenx.cuda(), leny.cuda()
-                        
-
-#                     encoder_outputs, encoder_hidden = encoder(inputs, lenx, val_h)
-
-#                     max_target_length = int(max(leny).item())
-#                     decoder_input = targets[:, :1]
-
-#                     all_decoder_outputs = torch.zeros(batch_size, max_target_length, decoder.output_size)
-
-#                     decoder_input = decoder_input.cuda()
-#                     all_decoder_outputs = all_decoder_outputs.cuda()
-
-#                     # Run through decoder one time step at a time
-#                     encoder_outputs, encoder_hidden = encoder(inputs, lenx, h)
-
-#                     decoder_hidden = encoder_hidden[:decoder.n_layers].cuda()
-
-#                     for t in range(max_target_length - 1):
-#                         decoder_output, decoder_hidden, decoder_attn = decoder(decoder_input, decoder_hidden, encoder_outputs)
-
-#                         all_decoder_outputs[:, t] = decoder_output
-#                         decoder_input = targets[:, t+1].unsqueeze(1) # Next input is current target
-                    
-#                     # get the output from the model
-#                     # h_dec = encoder_outputs
-#                     # print("Encoder_hidden: ", encoder_hidden.size())
-#                     # out, h_dec = decoder(targets[:, :-1], encoder_hidden[:decoder.n_layers], h_dec)
-#                     out = all_decoder_outputs
-#                     targets = targets[:, :out.size(1)]
-#                     # h_dec = encoder_outputs
-
-#                     # out, h_dec = decoder(targets[:, :-1], encoder_hidden[:decoder.n_layers], h_dec)
-#                     tar = targets.argmax(2)
-#                     tar = tar.view(tar.size(0)*tar.size(1))
-#                     cur = out.view(out.size(0)*out.size(1), -1)
-#                     val_loss = criterion(cur, tar)
-              
-#                     validation_loss.append(val_loss.item())
-#                     val_losses.append(val_loss.item())
-#                     output = cur
-#                     ind = min(len(validation_loss), 10)
-#                     acc_output = output.cpu().detach()
-
-#                     Y = tar.cpu().view(-1)
-
-#                     Y_hat = acc_output.argmax(1)
-#                     Y_hat = Y_hat.view(-1)
-
-#                     tag_pad_token = 1000
-#                     mask = (Y < tag_pad_token).float()
-
-#                     nb_tokens = int(torch.sum(mask).item())
-
-#                     current_accuracy =  (np.equal(Y_hat.numpy().astype("int32"), Y.numpy()) * mask.numpy()).sum()
-
-#                     div = nb_tokens
-#                     val_acc.append(current_accuracy/(div))
-#                     validation_accuracy.append(current_accuracy/(div))
     
     def _run_epoch_seq2seq(self, epoch):
         self.metric_counter.clear()
         
         counter = 0 
-        for lenX, X, leny, y in self.loader_train:
-
+        for lenX, X, leny, y, y1hot in self.loader_train:
             h = None
             lenX, perm_idx = lenX.sort(0, descending=True)
             X = X[perm_idx]
             y = y[perm_idx]
             leny = leny[perm_idx]
+            y1hot = y1hot[perm_idx]
 
-            X, y = X.cuda(), y.cuda()
+            X, y = X.float().cuda(), y.float().cuda()
             lenX, leny = lenX.cuda(), leny.cuda()
+            y1hot = y1hot.cuda()
+
 
             self.optimizer.zero_grad()
-            cur, tar = self.model(h, lenX, X, leny, y)
-            
+            out = self.model(h, lenX, X, leny, y)
+            tar = y1hot[:, :out.size(1)]
+            tar = tar.contiguous().view(tar.nelement())
+            cur = out.contiguous().view(tar.nelement(), -1)
             loss = self.loss_fn(cur, tar)
 
             loss.backward()
-            h = tuple([i.detach_() for i in h])
-            acc = self.calc_acc(cur, y.view(y.nelement()))
+
+            acc = self.calc_acc(cur, tar)
             nn.utils.clip_grad_norm_(self.model.parameters(), self.config['clip'])
-            self.optim.step()
+            self.optimizer.step()
 
             self.metric_counter.add_losses(loss)
             self.metric_counter.add_acc(acc)
@@ -230,22 +100,26 @@ class Trainer(object):
 
         counter = 0 
         self.model.eval()
-        loader = self.loader_test
-        for lenX, X, leny, y in loader:
+        loader = self.loader_val
+        for lenX, X, leny, y, y1hot in loader:
             h = None
             lenX, perm_idx = lenX.sort(0, descending=True)
             X = X[perm_idx]
             y = y[perm_idx]
             leny = leny[perm_idx]
+            y1hot = y1hot[perm_idx]
 
-            X, y = X.cuda(), y.cuda()
+            X, y = X.float().cuda(), y.float().cuda()
             lenX, leny = lenX.cuda(), leny.cuda()
+            y1hot = y1hot.cuda()
 
-            cur, tar = self.model(h, lenX, X, leny, y)
-            
+            out = self.model(h, lenX, X, leny, y)
+            tar = y1hot[:, :out.size(1)]
+            tar = tar.contiguous().view(tar.nelement())
+            cur = out.contiguous().view(tar.nelement(), -1)
             loss = self.loss_fn(cur, tar)
 
-            acc = self.calc_acc(cur, y.view(y.nelement()))
+            acc = self.calc_acc(cur, tar)
 
             self.metric_counter.add_losses(loss)
             self.metric_counter.add_acc(acc)
@@ -369,7 +243,8 @@ class Trainer(object):
                                self.config['model']['drop_prob'],
                                self.config['model']['grad_clip'],
                                self.config['model']['attn_model'],
-                               self.config['model']['n_input'])
+                               self.config['model']['dim'],
+                               self.config['model']['vs'])
 
         self.epochs = self.config['num_epochs']
         self.optimizer = self._get_optim(self.model.parameters())

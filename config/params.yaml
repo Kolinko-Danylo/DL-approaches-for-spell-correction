@@ -2,10 +2,10 @@ batch_size: 100
 clip: 5
 dataroot: data/big.txt
 experiment_desc: test_seq2seq
-model: {attn_model: general, drop_prob: 0.3, grad_clip: 5, loss: MaskedCE, model_n: seq2seq+attention,
-  n_hidden: 300, n_input: 1003, n_layers: 2}
+model: {attn_model: general, dim: 100, drop_prob: 0.3, grad_clip: 5, loss: MaskedCE,
+  model_n: seq2seq+attention, n_hidden: 300, n_input: 1003, n_layers: 2, vs: 1003}
 num_epochs: 1
 optimizer: {lr: 0.003, name: adam}
-print_every: 100
+print_every: 2
 seq_lenght: 50
 seq_length: 40

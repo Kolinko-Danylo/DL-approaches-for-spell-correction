@@ -78,14 +78,14 @@ class Attn(nn.Module):
 
 
 class LuongAttnDecoderRNN(nn.Module):
-    def __init__(self, attn_model, input_size, hidden_size, n_layers=1, dropout=0.1):
+    def __init__(self, attn_model, input_size, hidden_size, output_size, n_layers=1, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
 
         # Keep for reference
         self.input_size = input_size
         self.attn_model = attn_model
         self.hidden_size = hidden_size
-        self.output_size = input_size
+        self.output_size = output_size
         self.n_layers = n_layers
         self.dropout = dropout
 
@@ -119,10 +119,10 @@ class LuongAttnDecoderRNN(nn.Module):
 
 
 class AttentionAutoencoder(nn.Module):
-    def __init__(self, input_size, hidden_size, n_layers, attn_model):
+    def __init__(self, dim, hidden_size, vs, n_layers, attn_model):
         super().__init__()
-        self.encoder = EncoderRNN(input_size, hidden_size, n_layers)
-        self.decoder = LuongAttnDecoderRNN(attn_model, input_size, hidden_size, n_layers)
+        self.encoder = EncoderRNN(dim, hidden_size, n_layers)
+        self.decoder = LuongAttnDecoderRNN(attn_model, dim, hidden_size, vs, n_layers)
         
     def forward(self, hidden, lenX, X, leny, y):
         max_target_length = int(max(leny).item())
@@ -140,13 +140,9 @@ class AttentionAutoencoder(nn.Module):
             decoder_output, decoder_hidden, decoder_attn = self.decoder(decoder_input, decoder_hidden, encoder_outputs)
 
             all_decoder_outputs[:, t] = decoder_output
-            decoder_input = targets[:, t+1].unsqueeze(1) # Next input is current target
+            decoder_input = y[:, t+1].unsqueeze(1) # Next input is current target
 
-        out = all_decoder_outputs
-        tar = y[:, :out.size(1)]
-        tar = tar.view(tar.size(0)*tar.size(1))
-        cur = out.view(out.size(0)*out.size(1), -1)
-        return cur, tar
+        return all_decoder_outputs
 
 if __name__ == '__main__':
     ds = AttentionAutoencoder(1003, 300, 2, 'general')
