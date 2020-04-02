@@ -47,7 +47,9 @@ class Trainer(object):
                 torch.save({
                     'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
-                    'dataset_params': self.dataset.get_params()
+                    'dataset_params': self.dataset.get_params(),
+                    'n_hidden': self.config['model']['n_hidden'],
+                    'n_layers': self.config['model']['n_layers']
                 }, f'model/pretrained/best_{self.config["experiment_desc"]}.pth')
 
             print(self.metric_counter.loss_message())
@@ -149,6 +151,8 @@ class Trainer(object):
             X, y = X.cuda(), y.cuda()
 
             self.optimizer.zero_grad()
+            if h is not None:
+              h = tuple([x[:, :X.size(0)].contiguous() for x in h])
             output, h = self.model(X, h)
             
             loss = self.loss_fn(output, y.view(y.nelement()).long())
@@ -184,6 +188,8 @@ class Trainer(object):
 
         for X, y in loader:
             X, y = X.cuda(), y.cuda()
+            if h is not None:
+                h = tuple([x[:, :X.size(0)].contiguous() for x in h])
             output, h = self.model(X, h)
 
             loss = self.loss_fn(output, y.view(y.nelement()).long())

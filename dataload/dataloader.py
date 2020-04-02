@@ -15,26 +15,35 @@ from bpemb import BPEmb
 
 
 class SemicharDataset(data.Dataset):
-    def __init__(self, root_path, seq_length):
-        """Initialize the dataset"""
-        self.chars = None
-        self.root_path = root_path
-        self.seq_legth = seq_length
-        self.tokenized_data = self.tokenize(root_path)
-        self.tokenized_data = self.tokenized_data[:len(self.tokenized_data) - len(self.tokenized_data) % self.seq_legth]
-        self.data = np.array(self.tokenized_data).reshape(-1, seq_length)
-
-
-        self.int2char = dict(enumerate(self.chars))
-        self.char2int = {ch: ii for ii, ch in self.int2char.items()}
-
-        self.words = tuple(set(self.tokenized_data))
-        self.int2word = dict(enumerate(self.words))
-        self.word2int = {ch: ii for ii, ch in self.int2word.items()}
-        self.augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0,
-                                 aug_word_max= int(0.7*self.seq_length), special_char=False, tokenizer = lambda x: x.split(), reverse_tokenizer = lambda x: x)
+    def __init__(self, root_path, seq_length, predefined=False):
         
+        """Initialize the dataset"""
+        if not predefined:
+            self.chars = None
+            self.root_path = root_path
+            self.seq_length = seq_length
+            self.tokenized_data = self.tokenize(root_path)
+            self.tokenized_data = self.tokenized_data[:len(self.tokenized_data) - len(self.tokenized_data) % self.seq_length]
+            self.data = np.array(self.tokenized_data).reshape(-1, seq_length)
 
+
+            self.int2char = dict(enumerate(self.chars))
+            self.char2int = {ch: ii for ii, ch in self.int2char.items()}
+
+            self.words = tuple(set(self.tokenized_data))
+            self.int2word = dict(enumerate(self.words))
+            self.word2int = {ch: ii for ii, ch in self.int2word.items()}
+            self.augmentator = nac.KeyboardAug(aug_char_min=0, aug_char_p=0.4, aug_word_p=0.4, aug_word_min=0,
+                                    aug_word_max= int(0.7*self.seq_length), special_char=False, tokenizer = lambda x: x.split(), reverse_tokenizer = lambda x: x)
+            
+        else: 
+            self.int2char = predefined["int2char"]
+            self.char2int = predefined["char2int"]
+
+            self.words = predefined["words"]
+            self.int2word = predefined["int2word"]
+            self.word2int = predefined["word2int"]
+            self.chars = predefined["chars"]
 
     def tokenize(self, root_path):
         with open(root_path, 'r') as f:
@@ -67,8 +76,10 @@ class SemicharDataset(data.Dataset):
         augmented_data = self.augmentator.augment(" ".join(arr.ravel().tolist()))
         return np.array(augmented_data).reshape(arr.shape)
 
-    def get_encodes(self, arr):
-        arr = self.augment(arr)
+    def get_encodes(self, arr, use_aug=True):
+        if use_aug:
+            arr = self.augment(arr)
+        
 
         flat_arr = arr.ravel()
         splitted_encoded = np.array(list(map(lambda x: np.array([self.char2int[ch] for ch in x]), flat_arr)))

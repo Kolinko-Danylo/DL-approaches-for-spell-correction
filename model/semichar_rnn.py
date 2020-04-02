@@ -7,13 +7,12 @@ import torch.nn.functional as F
 class SemiCharRNN(nn.Module):
     
     def __init__(self, dataset_params, n_hidden=650, n_layers=2,
-                               drop_prob=0.5, lr=0.001):
+                               drop_prob=0.5, grad_clip = 5):
         super().__init__()
         self.dataset_params = dataset_params
         self.drop_prob = drop_prob
         self.n_layers = n_layers
         self.n_hidden = n_hidden
-        self.lr = lr
         
         
         self.rnn = nn.LSTM(3*len(self.dataset_params["chars"]), n_hidden, n_layers, 
