@@ -11,7 +11,8 @@ from torch.utils import data
 import string
 
 from bpemb import BPEmb
-
+import math
+import random
 
 
 class SemicharDataset(data.Dataset):
@@ -108,6 +109,7 @@ class SemicharDataset(data.Dataset):
       param_dict["words"] = self.words
       param_dict["int2word"] = self.int2word
       param_dict["word2int"] = self.word2int
+      param_dict["fasttext"] = True
 
       return param_dict
 
@@ -242,6 +244,89 @@ class seq2seqDataset(data.Dataset):
         
         return lengths_x, torch.from_numpy(X), lengths_y, torch.from_numpy(Y), torch.from_numpy(y1hot)
 
+
+class AutoCorrectionDataset(data.Dataset):
+    def __init__(self, root_path, seq_length, predefined=False):
+        
+        """Initialize the dataset"""
+        if not predefined:
+            self.chars = None
+            self.root_path = root_path
+            self.embed = fasttext.load_model(root_path.split(".")[0] + "_vectors.bin")
+            self.seq_length = seq_length
+            self.tokenized_data = self.tokenize(root_path)
+            self.tokenized_data = self.tokenized_data[:len(self.tokenized_data) - len(self.tokenized_data) % self.seq_length]
+            self.data = np.array(self.tokenized_data).reshape(-1, seq_length)
+
+
+            self.int2char = dict(enumerate(self.chars))
+            self.char2int = {ch: ii for ii, ch in self.int2char.items()}
+
+            self.words = tuple(set(self.tokenized_data))
+            self.int2word = dict(enumerate(self.words))
+            self.word2int = {ch: ii for ii, ch in self.int2word.items()}
+        else: 
+            self.int2char = predefined["int2char"]
+            self.char2int = predefined["char2int"]
+
+            self.words = predefined["words"]
+            self.int2word = predefined["int2word"]
+            self.word2int = predefined["word2int"]
+            self.chars = predefined["chars"]
+
+    def tokenize(self, root_path):
+        with open(root_path, 'r') as f:
+            text = f.read()
+            self.chars = tuple(set(text))
+
+        spacy_nlp = spacy.load('en_core_web_sm')
+        spacy_nlp.max_length = 2 * len(text)
+
+        x = spacy_nlp(text, disable=['parser', 'tagger', 'ner'])
+        splitted = [token.text for token in x if
+                    not (token.text.isspace() or (token.text[0].isdigit() and token.text[-1].isdigit()) or (token.text[0] in string.punctuation and token.text[-1] in string.punctuation))]
+        return splitted
+
+    def get_encodes(self, arr, use_aug=False):
+        def vectorize(f) :
+            def fnv(arr) :
+                return np.vstack([f(x) for x in arr])
+        return fnv
+
+        def cut_n_embed(self, x):
+            if use_aug:
+                x = x[:int(random.uniform(0, 1)*len(x))]
+            return self.embed.get_word_vector(x)
+
+        flat_arr = arr.ravel()
+        target = vectorize(self.get_int)(flat_arr[:].copy()).reshape(-1)
+        inputs = vectorize(cut_n_embed)(flat_arr)
+        return inputs, target
+
+    def get_int(self, x):
+        return self.word2int[x]
+
+    def get_params(self):
+      param_dict = dict()
+
+      param_dict["chars"] = self.chars
+      param_dict["int2char"] = self.int2char
+      param_dict["char2int"] = self.char2int
+      param_dict["words"] = self.words
+      param_dict["int2word"] = self.int2word
+      param_dict["word2int"] = self.word2int
+      param_dict["fasttext"] = True
+
+      return param_dict
+
+    def __len__(self):
+        return np.shape(self.data)[0]
+
+    def __getitem__(self, index):
+        sequence = self.data[index]
+        X, y = self.get_encodes(sequence.copy(), use_aug=True)
+        
+        return torch.from_numpy(X), torch.from_numpy(y)
 
 if __name__ == '__main__':
     ds = seq2seqDataset("data/big.txt", 40, 1000, 50)

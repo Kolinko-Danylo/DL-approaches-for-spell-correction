@@ -61,7 +61,7 @@ if __name__  == "__main__":
     st_dict = d['model']
     params = d['dataset_params']
 
-    model = SemiCharRNN(params, n_hidden=d['n_layers'], n_layers=d['n_layers'])
+    model = SemiCharRNN(params, n_hidden=d['n_hidden'], n_layers=d['n_layers'])
     model.load_state_dict(st_dict)
     model.eval()
 
