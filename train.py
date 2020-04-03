@@ -6,7 +6,7 @@ import numpy as np
 import yaml
 import logging
 from model.model_utils import get_model, get_loss
-from dataload.dataloader import seq2seqDataset, SemicharDataset, AutoCorrectionDataset
+from dataload.dataloader import seq2seqDataset, SemicharDataset, AutoCompleteDataset
 from metric_counter import MetricCounter
 import os
 from torch import nn
@@ -215,8 +215,8 @@ class Trainer(object):
 
   
     def _get_dataset(self, dataroot, seq_length):
-        if self.config['dataset'] == "autocorrect":
-            return AutoCorrectionDataset(dataroot, seq_length)
+        if self.config['dataset'] == "autocomplete":
+            return AutoCompleteDataset(dataroot, seq_length)
         if self.config['model']['model_n'] == "semichar_rnn":
             return SemicharDataset(dataroot, seq_length)
         if self.config['model']['model_n'] == "seq2seq+attention":
@@ -243,7 +243,6 @@ class Trainer(object):
         self.loader_test = data.DataLoader(self.test_dataset,
                                           batch_size=self.config['batch_size'],
                                           shuffle=False)
-                                          
         self.model = get_model(self.config['model']['model_n'],
                                self.dataset.get_params(),
                                self.config['model']['n_hidden'],

@@ -245,7 +245,7 @@ class seq2seqDataset(data.Dataset):
         return lengths_x, torch.from_numpy(X), lengths_y, torch.from_numpy(Y), torch.from_numpy(y1hot)
 
 
-class AutoCorrectionDataset(data.Dataset):
+class AutoCompleteDataset(data.Dataset):
     def __init__(self, root_path, seq_length, predefined=False):
         
         """Initialize the dataset"""
@@ -291,9 +291,9 @@ class AutoCorrectionDataset(data.Dataset):
         def vectorize(f) :
             def fnv(arr) :
                 return np.vstack([f(x) for x in arr])
-        return fnv
+            return fnv
 
-        def cut_n_embed(self, x):
+        def cut_n_embed(x):
             if use_aug:
                 x = x[:int(random.uniform(0, 1)*len(x))]
             return self.embed.get_word_vector(x)
