@@ -15,52 +15,53 @@ spacy_nlp = spacy.load('en_core_web_sm')
 
 
 class Completor:
-  def __init__(self, dataset_params, net):
+  def __init__(self, dataset_params, net, classes = 5):
     self.net = net
     self.dataset_params = dataset_params
-    self.dataset = AutoComplete(None, None, self.dataset_params)
+    self.dataset = AutoCompleteDataset(None, None, self.dataset_params)
     self.hidden = None
+    self.backup_hidden = None
+    self.last_word = ""
+    self.classes = classes
+  
+  def add_letter(self, letter):
+      if letter.isspace():
+          self.last_word = ""
+          self.hidden = self.backup_hidden
+      else:
+          self.last_word += letter
+      return self.predict()
 
-  def sample(self, sentence):
-    lst_res = []
-    z = spacy_nlp(sentence, disable=['parser', 'tagger', 'ner'])
-    spl = [token.text for token in z if not (token.text.isspace() or (token.text[0].isdigit() and token.text[-1].isdigit()))]
-    h = None
 
-    for word in spl:
-        pred, h = self.predict(word, h)
-        lst_res.append(self.dataset_params['int2word'][torch.argmax(pred).item()])
-    
-    return ' '.join(lst_res)
-
-  def predict(self, word, h=None):
-      x = np.array([word])
-      x = self.dataset.get_encodes(x, False).reshape(1, 1, -1)
-      
-      inputs = torch.from_numpy(x)
+  def predict(self):
+      x = np.array([self.last_word])
+      inputs, dummy_target  = self.dataset.get_encodes(x, False)
+      inputs = torch.from_numpy(inputs.reshape(1, 1, -1))
 
       if(train_on_gpu):
           inputs = inputs.cuda()
 
       
-      out, h = self.net(inputs, h)
-      h = tuple([each.detach_() for each in h])
+      out, self.backup_hidden = self.net(inputs, self.hidden)
+      # self.hidden = tuple([each.detach_() for each in self.hidden])
 
       if(train_on_gpu):
           out = out.cpu() # move to cpu
-
-      return out, h
+      pred_classes = torch.topk(out, k=self.classes)[1].numpy().reshape(-1)
+      
+      return [self.dataset_params['int2word'][ind] for ind in pred_classes]
 
 
     
 
 
 if __name__  == "__main__":
-    PATH = "model/pretrained/best_model.net"
+    PATH = "model/pretrained/best_test_autocomplete_model.net"
     dev = (torch.device('cpu') if not train_on_gpu else torch.device("cuda"))
     d = torch.load(PATH, map_location=dev)
     st_dict = d['model']
     params = d['dataset_params']
+    params["embed"] = "data/big_vectors.bin" #костиль (для кожної мережі додавати свій embed)
 
     model = SemiCharRNN(params, n_hidden=d['n_hidden'], n_layers=d['n_layers'])
     model.load_state_dict(st_dict)
@@ -71,7 +72,9 @@ if __name__  == "__main__":
     else:
         model.cpu()
 
-    cor = Corrector(params, model)
+    cor = Completor(params, model, classes = 5)
+
+
 
 
     HOST = '127.0.0.1'
@@ -94,4 +97,4 @@ if __name__  == "__main__":
                     data = conn.recv(1024)
                     if not data:
                         break
-                    conn.sendto(str.encode(cor.sample(data.decode())), addr)
+                    conn.sendto(str.encode(cor.add_letter(data.decode())), addr)

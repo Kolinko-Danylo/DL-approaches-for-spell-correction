@@ -265,7 +265,9 @@ class AutoCompleteDataset(data.Dataset):
             self.words = tuple(set(self.tokenized_data))
             self.int2word = dict(enumerate(self.words))
             self.word2int = {ch: ii for ii, ch in self.int2word.items()}
-        else: 
+        else:
+            self.embed = fasttext.load_model(predefined["embed"])
+
             self.int2char = predefined["int2char"]
             self.char2int = predefined["char2int"]
 
@@ -299,8 +301,9 @@ class AutoCompleteDataset(data.Dataset):
             return self.embed.get_word_vector(x)
 
         flat_arr = arr.ravel()
-        target = vectorize(self.get_int)(flat_arr[:].copy()).reshape(-1)
-        inputs = vectorize(cut_n_embed)(flat_arr)
+        target = vectorize(self.get_int)(flat_arr[:].copy()).reshape(-1) if use_aug else None
+        
+        inputs = vectorize(cut_n_embed)(flat_arr) 
         return inputs, target
 
     def get_int(self, x):
