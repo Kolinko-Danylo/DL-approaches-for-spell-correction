@@ -286,7 +286,7 @@ class AutoCompleteDataset(data.Dataset):
 
         x = spacy_nlp(text, disable=['parser', 'tagger', 'ner'])
         splitted = [token.text for token in x if
-                    not (token.text.isspace() or (token.text[0].isdigit() and token.text[-1].isdigit()) or (token.text[0] in string.punctuation and token.text[-1] in string.punctuation))]
+                    not token.text.isspace() ]
         return splitted
 
     def get_encodes(self, arr, use_aug=False):
@@ -297,17 +297,49 @@ class AutoCompleteDataset(data.Dataset):
 
         def cut_n_embed(x):
             if use_aug:
-                x = x[:int(random.uniform(0, 1)*len(x))]
-            return self.embed.get_word_vector(x)
-
-        flat_arr = arr.ravel()
-        target = vectorize(self.get_int)(flat_arr[:].copy()).reshape(-1) if use_aug else None
+                x = x[:int(min(random.uniform(0, 1.4), 1)*len(x))]
         
+            enc = [self.char2int[ch] for ch in x]
+            
+
+            if not enc:
+              ret = np.hstack([self.embed.get_word_vector(x), np.zeros((3 * len(self.chars)))]).astype(np.float32)
+              return ret
+            first_char_encoded = self.one_hot_encode(np.array(enc[0]), len(self.chars))
+            last_char_encoded = self.one_hot_encode(np.array(enc[-1]), len(self.chars))
+
+            middle_encoded = self.middle_embedding(np.array(enc), len(self.chars))
+            encoded_seq = np.hstack([first_char_encoded, middle_encoded, last_char_encoded])
+            
+            ret = np.hstack([self.embed.get_word_vector(x), encoded_seq])
+            return ret
+        flat_arr = arr.ravel()
+
+
+        target = vectorize(self.get_int)(flat_arr[:].copy()).reshape(-1) if use_aug else None
         inputs = vectorize(cut_n_embed)(flat_arr) 
+
+        
         return inputs, target
+
 
     def get_int(self, x):
         return self.word2int[x]
+
+    def one_hot_encode(self, arr, n_labels):
+        one_hot = np.zeros((arr.size, n_labels), dtype=np.float32)
+
+        # Fill the appropriate elements with ones
+        one_hot[np.arange(one_hot.shape[0]), arr.flatten()] = 1.
+
+        # Finally reshape it to get back to the original array
+        one_hot = one_hot.reshape((*arr.shape, n_labels))
+
+        return one_hot
+
+    def middle_embedding(self, word, n_labels):
+        return np.sum(self.one_hot_encode(word[1:-1], n_labels), axis=0)
+
 
     def get_params(self):
       param_dict = dict()

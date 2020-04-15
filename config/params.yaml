@@ -1,12 +1,12 @@
-batch_size: 100
+batch_size: 50
 clip: 5
 dataroot: data/big.txt
 dataset: autocomplete
-experiment_desc: test_autocomplete
+experiment_desc: refined_autocomplete
 model: {attn_model: general, dim: 100, drop_prob: 0.3, grad_clip: 5, loss: CE, model_n: semichar_rnn,
   n_hidden: 650, n_input: 1003, n_layers: 2, vs: 1003}
-num_epochs: 20
+num_epochs: 10
 optimizer: {lr: 0.001, name: adam}
 print_every: 100
 seq_lenght: 50
-seq_length: 6
+seq_length: 10

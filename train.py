@@ -33,6 +33,8 @@ class Trainer(object):
     def train(self):
 
         self._init_params()
+        # PATH = f'model/pretrained/best_{self.config["experiment_desc"]}.pth'
+        # self.model.load_state_dict(torch.load(PATH)['model'])
         self.model.cuda()
         
         for epoch in range(0, self.epochs):
